@@ -1,0 +1,12 @@
+{
+    "audioRadio|block": "Ljudradio",
+    "audioRadio.sendRecording|block": "skicka ljudklipp",
+    "audioRadio.wasDelivered|block": "ljudklippet levererades",
+    "audioRadio.onReceived|block": "när ljudklipp tas emot",
+    "audioRadio.isReceiving|block": "tar emot ljudklipp",
+    "audioRadio.listen|block": "lyssna efter ljudklipp",
+    "audioRadio.setPacketGap|block": "sätt paus mellan paket till $micros µs",
+    "{id:group}Send": "Skicka",
+    "{id:group}Receive": "Ta emot",
+    "{id:group}Settings": "Inställningar"
+}

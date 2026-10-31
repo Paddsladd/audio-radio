@@ -1,0 +1,26 @@
+{
+    "name": "audio-radio",
+    "version": "0.1.0",
+    "description": "Send and receive audio clips recorded with the Record extension over radio. micro:bit (V2) only",
+    "dependencies": {
+        "core": "*",
+        "radio": "*",
+        "audio-recording": "*",
+        "microphone": "*"
+    },
+    "files": [
+        "README.md",
+        "main.ts",
+        "audioradio.cpp",
+        "shims.d.ts",
+        "_locales/sv-SE/audio-radio-strings.json"
+    ],
+    "testFiles": [
+        "test.ts"
+    ],
+    "supportedTargets": [
+        "microbit"
+    ],
+    "license": "MIT",
+    "preferredEditor": "blocksprj"
+}
