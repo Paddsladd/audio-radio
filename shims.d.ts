@@ -31,6 +31,31 @@ declare namespace audioRadio {
      */
     //% shim=audioRadio::writeChunk
     function writeChunk(offset: int32, bytes: Buffer): void;
+
+    /**
+     * Start streaming the microphone into live packets tagged with streamId
+     */
+    //% shim=audioRadio::liveStart
+    function liveStart(streamId: int32): void;
+
+    /**
+     * Stop streaming the microphone
+     */
+    //% shim=audioRadio::liveStop
+    function liveStop(): void;
+
+    /**
+     * Next live packet ready to send, or an empty buffer if there is none
+     */
+    //% shim=audioRadio::liveNextPacket
+    function liveNextPacket(): Buffer;
+
+    /**
+     * Decode a received live packet and queue it for the speaker. lost is the number of packets
+     * missing just before this one; short gaps are filled with silence to keep the timing.
+     */
+    //% shim=audioRadio::livePlay
+    function livePlay(packet: Buffer, lost: int32): void;
 }
 
 // Auto-generated. Do not edit. Really.

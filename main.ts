@@ -1,8 +1,8 @@
 /**
- * Send and receive audio clips recorded with the Record extension over the radio. micro:bit (V2) only
+ * Talk live or send audio clips recorded with the Record extension over the radio. micro:bit (V2) only
  */
 //% weight=4 color=#015f85 icon="" block="Audio Radio"
-//% groups='["Send", "Receive", "Settings"]'
+//% groups='["Live", "Send", "Receive", "Settings"]'
 namespace audioRadio {
     // All packets go through radio.sendBuffer, whose payload is at most 19 bytes.
     //
@@ -19,6 +19,9 @@ namespace audioRadio {
     const PACKET_END = 0xA2
     const PACKET_NACK = 0xA3
     const PACKET_DONE = 0xA4
+    // LIVE: | type | stream | seq | ADPCM state (2) | 14 bytes of audio |, see audioradio.cpp
+    const PACKET_LIVE = 0xA8
+    const LIVE_PACKET_SIZE = 19
 
     const CHUNK_SIZE = 16
     const NACK_BITMAP_BYTES = 15
@@ -50,6 +53,16 @@ namespace audioRadio {
     let rxDoneLength = 0
     let onReceivedHandler: () => void = null
 
+    // Live state
+    const LIVE_PACKET_GAP_MICROS = 1000
+    const LIVE_STREAM_TIMEOUT_MS = 300
+    let talking = false
+    let liveSendLoopRunning = false
+    let hearWhileTalking = true
+    let liveRxStream = -1
+    let liveRxSeq = 0
+    let liveRxLast = -10000
+
     // Wrappers around the C++ in audioradio.cpp; the bodies only run in the simulator.
     //% shim=audioRadio::recordingLength
     function nativeRecordingLength(): number {
@@ -75,6 +88,23 @@ namespace audioRadio {
     function nativeWriteChunk(offset: number, bytes: Buffer): void {
     }
 
+    //% shim=audioRadio::liveStart
+    function nativeLiveStart(streamId: number): void {
+    }
+
+    //% shim=audioRadio::liveStop
+    function nativeLiveStop(): void {
+    }
+
+    //% shim=audioRadio::liveNextPacket
+    function nativeLiveNextPacket(): Buffer {
+        return control.createBuffer(0)
+    }
+
+    //% shim=audioRadio::livePlay
+    function nativeLivePlay(packet: Buffer, lost: number): void {
+    }
+
     function init() {
         if (initialized) return
         initialized = true
@@ -91,6 +121,9 @@ namespace audioRadio {
                 break
             case PACKET_DATA:
                 handleData(packet)
+                break
+            case PACKET_LIVE:
+                handleLive(packet)
                 break
             case PACKET_NACK:
             case PACKET_DONE:
@@ -145,6 +178,39 @@ namespace audioRadio {
         rxBitmap[chunk >> 3] |= bit
         rxReceived++
         nativeWriteChunk(chunk * CHUNK_SIZE, packet.slice(3))
+    }
+
+    function handleLive(packet: Buffer) {
+        if (packet.length < LIVE_PACKET_SIZE) return
+        if (talking && !hearWhileTalking) return
+        const stream = packet[1]
+        const seq = packet[2]
+        const now = control.millis()
+        if (stream != liveRxStream || now - liveRxLast > LIVE_STREAM_TIMEOUT_MS) {
+            // Stick with whoever is talking until they have been quiet for a moment
+            if (stream != liveRxStream && now - liveRxLast <= LIVE_STREAM_TIMEOUT_MS) return
+            liveRxStream = stream
+            liveRxSeq = (seq + 255) & 0xff
+        }
+        const lost = (seq - liveRxSeq - 1) & 0xff
+        if (lost > 128) return // duplicate or late
+        liveRxSeq = seq
+        liveRxLast = now
+        nativeLivePlay(packet, lost)
+    }
+
+    function liveSendLoop() {
+        while (talking) {
+            let packet = nativeLiveNextPacket()
+            while (packet.length > 0) {
+                radio.sendBuffer(packet)
+                packet = nativeLiveNextPacket()
+                // Spread bursts out so the receiver's small radio queue doesn't overflow
+                if (packet.length > 0) control.waitMicros(LIVE_PACKET_GAP_MICROS)
+            }
+            basic.pause(1)
+        }
+        liveSendLoopRunning = false
     }
 
     function sendNack() {
@@ -214,6 +280,91 @@ namespace audioRadio {
         const start = control.millis()
         while (txReply == 0 && control.millis() - start < REPLY_TIMEOUT_MS) basic.pause(5)
         return txReply
+    }
+
+    /**
+     * Start sending the microphone live over radio, like a phone call.
+     * Everyone in the same radio group hears it until "stop talking".
+     */
+    //% block="start talking"
+    //% blockId="audioradio_live_start"
+    //% group="Live"
+    //% weight=120
+    //% parts="microphone"
+    export function startTalking(): void {
+        init()
+        if (talking) return
+        talking = true
+        nativeLiveStart(randint(0, 255))
+        if (!liveSendLoopRunning) {
+            liveSendLoopRunning = true
+            control.inBackground(liveSendLoop)
+        }
+    }
+
+    /**
+     * Stop sending the microphone live
+     */
+    //% block="stop talking"
+    //% blockId="audioradio_live_stop"
+    //% group="Live"
+    //% weight=119
+    export function stopTalking(): void {
+        if (!talking) return
+        talking = false
+        nativeLiveStop()
+    }
+
+    /**
+     * Talk live while the button is held down, like a walkie-talkie.
+     * Also starts listening, so live audio from others is played.
+     */
+    //% block="push to talk with button $button"
+    //% blockId="audioradio_live_push_to_talk"
+    //% group="Live"
+    //% weight=118
+    //% parts="microphone"
+    export function pushToTalk(button: Button): void {
+        init()
+        control.onEvent(<number>button, DAL.MICROBIT_BUTTON_EVT_DOWN, startTalking)
+        control.onEvent(<number>button, DAL.MICROBIT_BUTTON_EVT_UP, stopTalking)
+    }
+
+    /**
+     * True while this micro:bit is sending live audio
+     */
+    //% block="is talking"
+    //% blockId="audioradio_live_is_talking"
+    //% group="Live"
+    //% weight=117
+    export function isTalking(): boolean {
+        return talking
+    }
+
+    /**
+     * True while live audio from another micro:bit is being received
+     */
+    //% block="someone is talking"
+    //% blockId="audioradio_live_someone_talking"
+    //% group="Live"
+    //% weight=116
+    export function someoneIsTalking(): boolean {
+        return control.millis() - liveRxLast < LIVE_STREAM_TIMEOUT_MS
+    }
+
+    /**
+     * Choose whether live audio from others is played while you are talking.
+     * On is like a phone call; turn it off (walkie-talkie) if the speaker feeds back into the microphone.
+     * @param on play others while talking, eg: true
+     */
+    //% block="hear others while talking $on"
+    //% blockId="audioradio_live_hear_while_talking"
+    //% group="Settings"
+    //% on.shadow="toggleOnOff" on.defl=true
+    //% weight=55
+    //% advanced=true
+    export function setHearWhileTalking(on: boolean): void {
+        hearWhileTalking = on
     }
 
     /**
@@ -305,7 +456,7 @@ namespace audioRadio {
     }
 
     /**
-     * Start listening for audio clips without an "on audio clip received" block
+     * Start listening for audio clips and live audio without an "on audio clip received" block
      */
     //% block="listen for audio clips"
     //% blockId="audioradio_listen"

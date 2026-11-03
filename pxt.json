@@ -1,7 +1,7 @@
 {
     "name": "audio-radio",
     "version": "0.1.0",
-    "description": "Send and receive audio clips recorded with the Record extension over radio. micro:bit (V2) only",
+    "description": "Talk live or send recorded audio clips over radio. micro:bit (V2) only",
     "dependencies": {
         "core": "*",
         "radio": "*",

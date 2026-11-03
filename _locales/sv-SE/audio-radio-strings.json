@@ -1,5 +1,11 @@
 {
     "audioRadio|block": "Ljudradio",
+    "audioRadio.startTalking|block": "börja prata",
+    "audioRadio.stopTalking|block": "sluta prata",
+    "audioRadio.pushToTalk|block": "tryck för att prata med knapp $button",
+    "audioRadio.isTalking|block": "pratar",
+    "audioRadio.someoneIsTalking|block": "någon pratar",
+    "audioRadio.setHearWhileTalking|block": "hör andra medan jag pratar $on",
     "audioRadio.sendRecording|block": "skicka ljudklipp",
     "audioRadio.wasDelivered|block": "ljudklippet levererades",
     "audioRadio.onReceived|block": "när ljudklipp tas emot",
@@ -8,5 +14,6 @@
     "audioRadio.setPacketGap|block": "sätt paus mellan paket till $micros µs",
     "{id:group}Send": "Skicka",
     "{id:group}Receive": "Ta emot",
-    "{id:group}Settings": "Inställningar"
+    "{id:group}Settings": "Inställningar",
+    "{id:group}Live": "Live"
 }
